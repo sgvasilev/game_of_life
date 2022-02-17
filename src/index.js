@@ -9,8 +9,11 @@ let CANVAS_WIDTH = null,
   listenerInputOne = null,
   listenerInputTwo = null,
   gridArr = [],
-  SQUARE_CANVAS = null
+  SQUARE_CANVAS = null,
+  BOARDS = []
+
 const PHASE = ["LIVE", "STOP"]
+
 let FULL_LENGTH = 0
 listeningOnInputs()
 function startCanvas() {
@@ -47,7 +50,7 @@ function startCanvas() {
     })
 }
 
-function drawLine(context, x1, y1, arr) {
+function drawLine(context, x1, y1) {
   context.beginPath()
   context.fillStyle = "rgb(0,0,0)"
   let closeX = null,
@@ -77,10 +80,6 @@ const prepareRender = () => {
   let USER_Y = 0
   let imageData
 
-  for (let i = 0; i < CANVAS_WIDTH; i += RESOLUTION) {
-    gridArr[i] = RESOLUTION + i
-  }
-
   const canvas = document.getElementById("ctx")
   const ctx = canvas.getContext("2d", { alpha: false })
 
@@ -101,18 +100,18 @@ const prepareRender = () => {
   })
   window.addEventListener("mouseup", () => {
     if (isDrawing === true) {
-      drawLine(ctx, USER_X, USER_Y, gridArr)
+      drawLine(ctx, USER_X, USER_Y)
       USER_X = 0
       USER_Y = 0
       isDrawing = false
       imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-      console.log(imageData.data)
+
       FULL_LENGTH = imageData.data.length
       SQUARE_CANVAS =
         (CANVAS_WIDTH + CANVAS_HEIGHT) * 2 +
         (CANVAS_WIDTH + CANVAS_HEIGHT - 4) * 2 -
         8
-      nextGeneration(imageData, ctx)
+      update(imageData, ctx)
     }
   })
 }
@@ -132,7 +131,6 @@ function mountCanvas() {
   })
   cellPicture.setAttribute("id", "ctx")
   document.getElementById("canvas").appendChild(cellPicture)
-  // document.getElementById("canvas").style.width = "400px"
   prepareRender()
 }
 
@@ -157,97 +155,56 @@ function calcResolution() {
   document.getElementById("input_1").disabled = true
 }
 
-function nextGeneration(grid, ctx) {
-  let nextGenArr = new ImageData(
-    new Uint8ClampedArray(grid.data),
-    grid.width,
-    grid.height
-  )
+function update(grid, ctx) {
+  let nextGenArr = new ImageData(grid.data, grid.width, grid.height)
+  FULL_LENGTH = nextGenArr.data.length
+  console.log(FULL_LENGTH, "FULL_LENGTH")
   let counter = 0
   let tempWidth = CANVAS_WIDTH * 4
+  console.log(tempWidth, "tempWidth")
+  let tempHeight = CANVAS_HEIGHT * 4
+  let neighbor = 0
+  let allNeighbor = 0
+  for (let i = 0; i < FULL_LENGTH; i += 4) {
+    neighbor =
+      grid.data[i - tempWidth - 1] +
+      grid.data[i - tempWidth] +
+      grid.data[i - tempWidth + 1] +
+      grid.data[i - 1] +
+      grid.data[i + 1] +
+      grid.data[i + tempWidth - 1] +
+      grid.data[i + tempWidth] +
+      grid.data[i + tempWidth + 1]
 
-  let fullLength = grid.data.length
-
-  nextGenArr.data[0] = nextCellStatus([
-    grid.data[fullLength - 3],
-    grid.data[fullLength - tempWidth],
-    grid.data[fullLength - tempWidth + 4],
-    grid.data[tempWidth - 3],
-    grid.data[0],
-    grid.data[3],
-    grid.data[tempWidth * 2 + 3],
-    grid.data[tempWidth * RESOLUTION + 1],
-    grid.data[tempWidth * RESOLUTION + 4],
-  ])
-
+    if (grid.data[i] === 0) {
+      if (neighbor === 1530 || neighbor === 1275) {
+        nextGenArr.data[i] = 0
+        nextGenArr.data[i + 1] = 0
+        nextGenArr.data[i + 2] = 0
+      } else {
+        nextGenArr.data[i] = 255
+        nextGenArr.data[i + 1] = 255
+        nextGenArr.data[i + 2] = 255
+      }
+    } else {
+      if (neighbor === 1275) {
+        nextGenArr.data[i] = 0
+        nextGenArr.data[i + 1] = 0
+        nextGenArr.data[i + 2] = 0
+      } else {
+        nextGenArr.data[i] = 255
+        nextGenArr.data[i + 1] = 255
+        nextGenArr.data[i + 2] = 255
+      }
+    }
+    neighbor = 0
+  }
+  // console.log(nextGenArr)
   ctx.putImageData(nextGenArr, 0, 0)
 }
 const IS_ALIVE = 0
 const IS_DEAD = 255
 
-function nextCellStatus(props) {
-  if (props[4] === 255) {
-    let sumCell =
-      props[0] +
-      props[1] +
-      props[2] +
-      props[3] +
-      props[5] +
-      props[6] +
-      props[7] +
-      props[8]
-    if (sumCell === 1275) {
-      console.log(
-        props[0],
-        props[1],
-        props[2],
-        props[3],
-        props[5],
-        props[6],
-        props[7],
-        props[8],
-        "alive"
-      )
-      return (cellStatus = IS_ALIVE)
-    } else {
-      console.log(
-        props[0],
-        props[1],
-        props[2],
-        props[3],
-        props[5],
-        props[6],
-        props[7],
-        props[8],
-        "dead"
-      )
-      return (cellStatus = IS_DEAD)
-    }
-  } else {
-    let sumCell =
-      props[0] +
-      props[1] +
-      props[2] +
-      props[3] +
-      props[5] +
-      props[6] +
-      props[7] +
-      props[8]
-    console.log(
-      props[0],
-      props[1],
-      props[2],
-      props[3],
-      props[5],
-      props[6],
-      props[7],
-      props[8],
-      "???"
-    )
-    if (sumCell < 1530) return (cellStatus = IS_DEAD)
-    if (sumCell > 1275) return (cellStatus = IS_DEAD)
-    else {
-      return (cellStatus = IS_ALIVE)
-    }
-  }
+function fillZeroes(ctx, nextGenArr, data) {
+  ctx.fill
 }

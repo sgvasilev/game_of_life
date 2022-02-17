@@ -47,6 +47,7 @@ const display = Object.assign(document.createElement("canvas"), {
 display.ctx = display.getContext("2d")
 display.pixels = display.ctx.getImageData(0, 0, SIZE, SIZE)
 display.buf32 = new Uint32Array(display.pixels.data.buffer)
+console.log(display.buf32)
 const PIXELS = [0, 0xff000000] // Uint32 pixel value NOTE channel order ABGR
 // eg 0xFF000000 is black 0xFF0000FF is red
 document.body.appendChild(display)
