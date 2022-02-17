@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="./style.css" />
+    <title>Document</title>
+  </head>
+  <body class="flex">
+    <div class="input-wrapper">
+      <h3 class="h3__Style">Настройки</h3>
+      <div class="user-unit">
+        <form id="data" class="user-input">
+          <span>Поле: &nbsp;</span>
+          <input
+            id="width_input"
+            class="input"
+            inputmode="numeric"
+            placeholder="Ширина"
+          />
+          <input
+            id="height_input"
+            class="input"
+            inputmode="numeric"
+            placeholder="Высота"
+          />
+          <button class="button" form="data" id="startButton" type="submit">
+            Старт
+          </button>
+          <button class="button" id="stopButton">Сброс</button>
+        </form>
+        <div class="user-input">
+          <span>Размер ячейки: &nbsp;</span>
+          <div>
+            <input
+              class="user-input__input"
+              type="range"
+              min="0"
+              max="10"
+              step="2"
+              value="6"
+              oninput="this.nextElementSibling.value = this.value"
+              id="input_1"
+            />
+            <output id="output_1" class="user-input__output">6</output>
+          </div>
+        </div>
+        <div class="user-input">
+          <span>Скорость: &nbsp;</span>
+          <div>
+            <input
+              class="user-input__input"
+              type="range"
+              min="1"
+              max="10"
+              step="1"
+              value="6"
+              oninput="this.nextElementSibling.value = this.value"
+              id="input_2"
+            />
+
+            <output id="output_2" class="user-input__output">6</output>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-wrapper">
+      <div id="canvas"></div>
+    </div>
+    <script src="./index.js"></script>
+  </body>
+</html>
