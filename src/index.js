@@ -1,36 +1,50 @@
 let CANVAS_WIDTH = null,
   CANVAS_HEIGHT = null,
-  RESOLUTION = 6,
-  BIAS = 3,
-  CANVAS_WIDTH_CALC = null,
-  CANVAS_HEIGHT_CALC = null,
-  SPEED = null,
-  lineWidth = null,
-  listenerInputOne = null,
-  listenerInputTwo = null,
-  gridArr = [],
-  SQUARE_CANVAS = null,
-  BOARDS = []
+  NEIGHBOR_OFFSETS_X,
+  NEIGHBOR_OFFSETS_Y,
+  RESOLUTION = 4,
+  coord = { x: 0, y: 0 },
+  ctx,
+  BOARDS = [],
+  imageData,
+  DELAY = 32,
+  data32,
+  startPainting,
+  stopPainting,
+  sketch
+var pos = { x: 0, y: 0 }
+const LIVE = "LIVE",
+  STOP = "STOP"
+const PHASE = [LIVE, STOP],
+  SIZE = 200
+let NEIGHBOR_OFFSETS = [],
+  COLOR = [0, 0xff000000]
 
-const PHASE = ["LIVE", "STOP"]
-
-let FULL_LENGTH = 0
-listeningOnInputs()
-function startCanvas() {
+function calcCanvas() {
   document
     .getElementById("startButton")
     .addEventListener("click", function (event) {
       event.preventDefault()
       CANVAS_WIDTH = +event.target.form[0].value
       CANVAS_HEIGHT = +event.target.form[1].value
-      const isCanvasMounted = document.querySelector("#canvas")
+      NEIGHBOR_OFFSETS_X = [-1, 0, 1, -1, 1, -1, 0, 1]
+      NEIGHBOR_OFFSETS_Y = [-1, -1, -1, 0, 0, 1, 1, 1]
+      NEIGHBOR_OFFSETS = [
+        -CANVAS_WIDTH - 1,
+        -CANVAS_WIDTH,
+        -CANVAS_WIDTH + 1,
+        -1,
+        +1,
+        +CANVAS_WIDTH - 1,
+        +CANVAS_WIDTH,
+        +CANVAS_WIDTH + 1,
+      ]
+      const isCanvasMounted = document.querySelector("#canvas__mount")
       if (!isCanvasMounted.hasChildNodes()) {
         if (CANVAS_WIDTH === 0 || CANVAS_HEIGHT === 0) return
-        calcResolution()
         mountCanvas()
       } else {
         isCanvasMounted.removeChild(isCanvasMounted.firstChild)
-        calcResolution()
         mountCanvas()
       }
     })
@@ -38,173 +52,184 @@ function startCanvas() {
     .getElementById("stopButton")
     .addEventListener("click", function (event) {
       event.preventDefault()
-      document.getElementById("input_1").disabled = false
-      const isCanvasMounted = document.querySelector("#canvas")
+      const isCanvasMounted = document.querySelector("#canvas__mount")
+      console.log(isCanvasMounted, "isCanvasMounted")
       if (isCanvasMounted.hasChildNodes()) {
         isCanvasMounted.removeChild(isCanvasMounted.firstChild)
       } else {
         if (CANVAS_WIDTH === 0 || CANVAS_HEIGHT === 0) return
-        calcResolution()
-        mountCanvas()
       }
     })
+  document.getElementById("startLoop").addEventListener("click", startLoop)
 }
 
-function drawLine(context, x1, y1) {
-  context.beginPath()
-  context.fillStyle = "rgb(0,0,0)"
-  let closeX = null,
-    closeY = null
+function mountCanvas() {
+  const canvas = document.createElement("canvas")
+  CANVAS_WIDTH = CANVAS_WIDTH + (CANVAS_WIDTH % RESOLUTION)
+  CANVAS_HEIGHT = CANVAS_HEIGHT + (CANVAS_HEIGHT % RESOLUTION)
 
-  closeX = x1 % RESOLUTION
-  closeY = y1 % RESOLUTION
+  canvas.width = CANVAS_WIDTH
+  canvas.height = CANVAS_HEIGHT
 
-  if (closeX === BIAS) {
-    x1 = x1 - BIAS
-  } else {
-    x1 = x1 - closeX
-  }
-  if (closeY === BIAS) {
-    y1 = y1 - BIAS
-  } else {
-    y1 = y1 - closeY
-  }
+  canvas.id = "ctx"
+  canvas.style.width = `${CANVAS_WIDTH * RESOLUTION}px`
+  canvas.style.height = `${CANVAS_HEIGHT * RESOLUTION}px`
 
-  context.fillRect(x1, y1, RESOLUTION, RESOLUTION)
-  context.stroke()
-  context.closePath()
+  BOARDS = [
+    new Array(CANVAS_WIDTH * CANVAS_HEIGHT).fill(0),
+    new Array(CANVAS_WIDTH * CANVAS_HEIGHT).fill(0),
+  ]
+  canvas.classList.add("border")
+  document.querySelector("#canvas__mount").appendChild(canvas)
+  //some optimizations
+  ctx = canvas.getContext("2d")
+  ctx.imageSmoothingEnabled = false
+  drawStartPosition(canvas)
 }
-const prepareRender = () => {
-  let isDrawing = false
-  let USER_X = 0
-  let USER_Y = 0
-  let imageData
 
-  const canvas = document.getElementById("ctx")
-  const ctx = canvas.getContext("2d", { alpha: false })
-
-  ctx.fillStyle = "rgb(255,255,255)"
+function drawStartPosition(canvas) {
+  console.log("render")
+  ctx.data = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  ctx.fillStyle = "white"
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-  canvas.addEventListener("mousedown", (e) => {
-    USER_X = e.offsetX
-    USER_Y = e.offsetY
-    isDrawing = true
-  })
-
-  canvas.addEventListener("mousemove", (e) => {
-    if (isDrawing === true) {
-      drawLine(ctx, USER_X, USER_Y, e.offsetX, e.offsetY)
-      USER_X = e.offsetX
-      USER_Y = e.offsetY
-    }
-  })
-  window.addEventListener("mouseup", () => {
-    if (isDrawing === true) {
-      drawLine(ctx, USER_X, USER_Y)
-      USER_X = 0
-      USER_Y = 0
-      isDrawing = false
-      imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
-
-      FULL_LENGTH = imageData.data.length
-      SQUARE_CANVAS =
-        (CANVAS_WIDTH + CANVAS_HEIGHT) * 2 +
-        (CANVAS_WIDTH + CANVAS_HEIGHT - 4) * 2 -
-        8
-      update(imageData, ctx)
-    }
-  })
+  imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  data32 = new Uint32Array(imageData.data.buffer)
+  document.addEventListener("mousedown", startPainting)
+  document.addEventListener("mouseup", stopPainting)
+  document.addEventListener("mousemove", sketch)
+  let paint = false
+  function getPosition(event) {
+    coord.x = event.clientX - canvas.offsetLeft
+    coord.y = event.clientY - canvas.offsetTop
+  }
+  function startPainting(event) {
+    paint = true
+    getPosition(event)
+  }
+  function stopPainting() {
+    paint = false
+  }
+  function sketch(event) {
+    if (!paint) return
+    ctx.fillStyle = "black"
+    let X = Math.floor(coord.x / RESOLUTION)
+    let Y = Math.floor(coord.y / RESOLUTION)
+    getPosition(event)
+    ctx.fillRect(X, Y, 1, 1)
+  }
 }
+
+function startLoop(event) {
+  event.preventDefault()
+
+  document.removeEventListener("mousedown", startPainting)
+  document.removeEventListener("mouseup", stopPainting)
+  document.removeEventListener("mousemove", sketch)
+  const tempData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
+  let j = 0
+  let data = data32
+  for (let i = 0; i < tempData.data.length; i += 4) {
+    BOARDS[0][j] = tempData.data[i] === 255 ? 0 : 1
+    data[i] = COLOR[BOARDS[0][j]]
+    j++
+  }
+  console.log(BOARDS[0])
+  window.requestAnimationFrame(() => drawImage(BOARDS[0]))
+  renew()
+}
+function renew() {
+  let LIVING_CELLS = 0
+  const boardPrev = BOARDS[0]
+  const boardNext = BOARDS[1]
+  let index = 0
+  let neighbors = 0
+  let count = 0
+  for (let i = 0; i < CANVAS_HEIGHT; i++) {
+    for (let j = 0; j < CANVAS_WIDTH; j++) {
+      if (
+        i === 0 ||
+        i === CANVAS_HEIGHT - 1 ||
+        j === 0 ||
+        j === CANVAS_WIDTH - 1
+      ) {
+        neighbors = 0
+        count = 0
+        while (neighbors < NEIGHBOR_OFFSETS_X.length) {
+          let resultX =
+            (j + NEIGHBOR_OFFSETS_X[neighbors] + CANVAS_WIDTH) % CANVAS_WIDTH
+
+          const resultY =
+            (i + NEIGHBOR_OFFSETS_Y[neighbors] + CANVAS_HEIGHT) % CANVAS_HEIGHT
+
+          count += boardPrev[resultY * CANVAS_HEIGHT + resultX]
+          neighbors++
+        }
+      } else {
+        neighbors = 0
+        count = 0
+        while (neighbors < NEIGHBOR_OFFSETS_Y.length) {
+          count +=
+            boardPrev[i * CANVAS_HEIGHT + j + NEIGHBOR_OFFSETS[neighbors]]
+          neighbors++
+        }
+      }
+      if (boardPrev[index] === 1) {
+        if (count === 2 || count === 3) {
+          boardNext[index] = 1
+          LIVING_CELLS++
+        } else {
+          boardNext[index] = 0
+        }
+      } else if (boardPrev[index] === 0) {
+        if (count === 3) {
+          boardNext[index] = 1
+          LIVING_CELLS++
+        } else {
+          boardNext[index] = 0
+        }
+      } else {
+        boardNext[index] = boardPrev[index]
+      }
+      // console.log(
+      //   boardPrev[index],
+      //   `WAS ${boardPrev[index] === 1 ? "ALIVE" : "dead"} become ${
+      //     boardNext[index] === 1 ? "ALIVE" : "DEAD"
+      //   } `
+      // )
+      index++
+      count = 0
+    }
+  }
+
+  drawImage(boardNext)
+  for (let i = 0; i < boardNext.length; i++) {
+    BOARDS[0][i] = boardNext[i]
+  }
+  setTimeout(() => {
+    renew()
+  }, DELAY)
+}
+
+function drawImage(board) {
+  for (let i = 0; i < data32.length; i++) {
+    data32[i] = COLOR[board[i]]
+  }
+  ctx.putImageData(imageData, 0, 0)
+}
+
+// function rerender() {
+//   const LIVING_CELLS = renew()
+//   if (LIVING_CELLS) {
+//     setTimeout(() => {
+//       renew()
+//     }, DELAY)
+//   }
+// }
 
 document.addEventListener(
   "DOMContentLoaded",
   function () {
-    startCanvas()
+    calcCanvas()
   },
   false
 )
-
-function mountCanvas() {
-  const cellPicture = Object.assign(document.createElement("canvas"), {
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
-  })
-  cellPicture.setAttribute("id", "ctx")
-  document.getElementById("canvas").appendChild(cellPicture)
-  prepareRender()
-}
-
-function listeningOnInputs() {
-  listenerInputOne = document.getElementById("input_1")
-  listenerInputOne.addEventListener("change", listenOnSizeChange, false)
-}
-function listenOnSizeChange(event) {
-  RESOLUTION = event.target.value
-  BIAS = RESOLUTION / 2
-}
-
-function calcResolution() {
-  if (RESOLUTION == 0) {
-    RESOLUTION = 1
-  }
-  CANVAS_WIDTH_CALC = CANVAS_WIDTH % RESOLUTION
-  CANVAS_HEIGHT_CALC = CANVAS_HEIGHT % RESOLUTION
-  CANVAS_WIDTH = CANVAS_WIDTH + (RESOLUTION - CANVAS_WIDTH_CALC)
-  CANVAS_HEIGHT = CANVAS_HEIGHT + (RESOLUTION - CANVAS_HEIGHT_CALC)
-
-  document.getElementById("input_1").disabled = true
-}
-
-function update(grid, ctx) {
-  let nextGenArr = new ImageData(grid.data, grid.width, grid.height)
-  FULL_LENGTH = nextGenArr.data.length
-  console.log(FULL_LENGTH, "FULL_LENGTH")
-  let counter = 0
-  let tempWidth = CANVAS_WIDTH * 4
-  console.log(tempWidth, "tempWidth")
-  let tempHeight = CANVAS_HEIGHT * 4
-  let neighbor = 0
-  let allNeighbor = 0
-  for (let i = 0; i < FULL_LENGTH; i += 4) {
-    neighbor =
-      grid.data[i - tempWidth - 1] +
-      grid.data[i - tempWidth] +
-      grid.data[i - tempWidth + 1] +
-      grid.data[i - 1] +
-      grid.data[i + 1] +
-      grid.data[i + tempWidth - 1] +
-      grid.data[i + tempWidth] +
-      grid.data[i + tempWidth + 1]
-
-    if (grid.data[i] === 0) {
-      if (neighbor === 1530 || neighbor === 1275) {
-        nextGenArr.data[i] = 0
-        nextGenArr.data[i + 1] = 0
-        nextGenArr.data[i + 2] = 0
-      } else {
-        nextGenArr.data[i] = 255
-        nextGenArr.data[i + 1] = 255
-        nextGenArr.data[i + 2] = 255
-      }
-    } else {
-      if (neighbor === 1275) {
-        nextGenArr.data[i] = 0
-        nextGenArr.data[i + 1] = 0
-        nextGenArr.data[i + 2] = 0
-      } else {
-        nextGenArr.data[i] = 255
-        nextGenArr.data[i + 1] = 255
-        nextGenArr.data[i + 2] = 255
-      }
-    }
-    neighbor = 0
-  }
-  // console.log(nextGenArr)
-  ctx.putImageData(nextGenArr, 0, 0)
-}
-const IS_ALIVE = 0
-const IS_DEAD = 255
-
-function fillZeroes(ctx, nextGenArr, data) {
-  ctx.fill
-}

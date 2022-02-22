@@ -26,7 +26,7 @@
             placeholder="Высота"
           />
           <button class="button" form="data" id="startButton" type="submit">
-            Старт
+            Заполнить
           </button>
           <button class="button" id="stopButton">Сброс</button>
         </form>
@@ -39,11 +39,11 @@
               min="0"
               max="10"
               step="2"
-              value="6"
+              value="4"
               oninput="this.nextElementSibling.value = this.value"
               id="input_1"
             />
-            <output id="output_1" class="user-input__output">6</output>
+            <output id="output_1" class="user-input__output">4</output>
           </div>
         </div>
         <div class="user-input">
@@ -62,12 +62,22 @@
 
             <output id="output_2" class="user-input__output">6</output>
           </div>
+          <div>
+            <button class="button" form="data" id="startLoop" type="submit">
+              Старт
+            </button>
+          </div>
+          <!-- <div>
+            <button class="button" form="data" id="startLoop" type="submit">
+              Стоп
+            </button>
+          </div> -->
         </div>
       </div>
     </div>
 
     <div class="canvas-wrapper">
-      <div id="canvas"></div>
+      <div id="canvas__mount" clas="border"></div>
     </div>
     <script src="./index.js"></script>
   </body>
