@@ -1,44 +1,48 @@
 let CANVAS_WIDTH = null,
   CANVAS_HEIGHT = null,
-  NEIGHBOR_OFFSETS_X,
-  NEIGHBOR_OFFSETS_Y,
-  RESOLUTION = 4,
+  RESOLUTION = 2,
   coord = { x: 0, y: 0 },
   ctx,
   BOARDS = [],
   imageData,
-  DELAY = 32,
+  DELAY = 8,
   data32,
-  startPainting,
-  stopPainting,
-  sketch
-var pos = { x: 0, y: 0 }
-const LIVE = "LIVE",
-  STOP = "STOP"
-const PHASE = [LIVE, STOP],
-  SIZE = 200
-let NEIGHBOR_OFFSETS = [],
+  NEIGHBOR_OFFSETS = [],
+  isRendering = false
+
+let pos = { x: 0, y: 0 }
+
+const NEIGHBOR_OFFSETS_X = [-1, 0, 1, -1, 1, -1, 0, 1],
+  NEIGHBOR_OFFSETS_Y = [-1, -1, -1, 0, 0, 1, 1, 1],
   COLOR = [0, 0xff000000]
 
 function calcCanvas() {
+  const calcResolution = document.getElementById("input_1")
+  calcResolution.addEventListener("change", () => {
+    if (calcResolution.value == 0) {
+      RESOLUTION = 1
+    } else {
+      RESOLUTION = calcResolution.value
+    }
+  })
+  const randomValues = document.getElementById("random")
+  randomValues.addEventListener("click", (event) => {
+    randomize(event)
+  })
+  const setStopLoop = document.getElementById("stopLoop")
+  setStopLoop.addEventListener("click", stopDraw)
+  const changeDelay = document.getElementById("delay_input")
+  changeDelay.addEventListener("change", () => {
+    DELAY = changeDelay.value
+  })
   document
     .getElementById("startButton")
     .addEventListener("click", function (event) {
       event.preventDefault()
+      calcResolution.disabled = true
       CANVAS_WIDTH = +event.target.form[0].value
-      CANVAS_HEIGHT = +event.target.form[1].value
-      NEIGHBOR_OFFSETS_X = [-1, 0, 1, -1, 1, -1, 0, 1]
-      NEIGHBOR_OFFSETS_Y = [-1, -1, -1, 0, 0, 1, 1, 1]
-      NEIGHBOR_OFFSETS = [
-        -CANVAS_WIDTH - 1,
-        -CANVAS_WIDTH,
-        -CANVAS_WIDTH + 1,
-        -1,
-        +1,
-        +CANVAS_WIDTH - 1,
-        +CANVAS_WIDTH,
-        +CANVAS_WIDTH + 1,
-      ]
+      CANVAS_HEIGHT = CANVAS_WIDTH
+
       const isCanvasMounted = document.querySelector("#canvas__mount")
       if (!isCanvasMounted.hasChildNodes()) {
         if (CANVAS_WIDTH === 0 || CANVAS_HEIGHT === 0) return
@@ -48,25 +52,25 @@ function calcCanvas() {
         mountCanvas()
       }
     })
-  document
-    .getElementById("stopButton")
-    .addEventListener("click", function (event) {
-      event.preventDefault()
-      const isCanvasMounted = document.querySelector("#canvas__mount")
-      console.log(isCanvasMounted, "isCanvasMounted")
-      if (isCanvasMounted.hasChildNodes()) {
-        isCanvasMounted.removeChild(isCanvasMounted.firstChild)
-      } else {
-        if (CANVAS_WIDTH === 0 || CANVAS_HEIGHT === 0) return
-      }
-    })
-  document.getElementById("startLoop").addEventListener("click", startLoop)
+  document.getElementById("stopButton").addEventListener("click", () => {
+    clearCanvas()
+  })
 }
 
 function mountCanvas() {
   const canvas = document.createElement("canvas")
   CANVAS_WIDTH = CANVAS_WIDTH + (CANVAS_WIDTH % RESOLUTION)
   CANVAS_HEIGHT = CANVAS_HEIGHT + (CANVAS_HEIGHT % RESOLUTION)
+  NEIGHBOR_OFFSETS = [
+    -CANVAS_WIDTH - 1,
+    -CANVAS_WIDTH,
+    -CANVAS_WIDTH + 1,
+    -1,
+    +1,
+    +CANVAS_WIDTH - 1,
+    +CANVAS_WIDTH,
+    +CANVAS_WIDTH + 1,
+  ]
 
   canvas.width = CANVAS_WIDTH
   canvas.height = CANVAS_HEIGHT
@@ -81,22 +85,22 @@ function mountCanvas() {
   ]
   canvas.classList.add("border")
   document.querySelector("#canvas__mount").appendChild(canvas)
-  //some optimizations
   ctx = canvas.getContext("2d")
   ctx.imageSmoothingEnabled = false
   drawStartPosition(canvas)
 }
 
 function drawStartPosition(canvas) {
-  console.log("render")
   ctx.data = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   ctx.fillStyle = "white"
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   imageData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   data32 = new Uint32Array(imageData.data.buffer)
+
   document.addEventListener("mousedown", startPainting)
   document.addEventListener("mouseup", stopPainting)
-  document.addEventListener("mousemove", sketch)
+  document.addEventListener("mousemove", draw)
+
   let paint = false
   function getPosition(event) {
     coord.x = event.clientX - canvas.offsetLeft
@@ -109,7 +113,7 @@ function drawStartPosition(canvas) {
   function stopPainting() {
     paint = false
   }
-  function sketch(event) {
+  function draw(event) {
     if (!paint) return
     ctx.fillStyle = "black"
     let X = Math.floor(coord.x / RESOLUTION)
@@ -117,14 +121,19 @@ function drawStartPosition(canvas) {
     getPosition(event)
     ctx.fillRect(X, Y, 1, 1)
   }
+  const startButton = document.getElementById("startLoop")
+  startButton.addEventListener("click", () => {
+    startLoop(event, startPainting, stopPainting, draw)
+  })
 }
 
-function startLoop(event) {
+function startLoop(event, startPainting, stopPainting, sketch) {
+  isRendering = true
   event.preventDefault()
-
   document.removeEventListener("mousedown", startPainting)
   document.removeEventListener("mouseup", stopPainting)
   document.removeEventListener("mousemove", sketch)
+
   const tempData = ctx.getImageData(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT)
   let j = 0
   let data = data32
@@ -133,12 +142,10 @@ function startLoop(event) {
     data[i] = COLOR[BOARDS[0][j]]
     j++
   }
-  console.log(BOARDS[0])
   window.requestAnimationFrame(() => drawImage(BOARDS[0]))
   renew()
 }
 function renew() {
-  let LIVING_CELLS = 0
   const boardPrev = BOARDS[0]
   const boardNext = BOARDS[1]
   let index = 0
@@ -176,38 +183,35 @@ function renew() {
       if (boardPrev[index] === 1) {
         if (count === 2 || count === 3) {
           boardNext[index] = 1
-          LIVING_CELLS++
         } else {
           boardNext[index] = 0
         }
       } else if (boardPrev[index] === 0) {
         if (count === 3) {
           boardNext[index] = 1
-          LIVING_CELLS++
         } else {
           boardNext[index] = 0
         }
       } else {
         boardNext[index] = boardPrev[index]
       }
-      // console.log(
-      //   boardPrev[index],
-      //   `WAS ${boardPrev[index] === 1 ? "ALIVE" : "dead"} become ${
-      //     boardNext[index] === 1 ? "ALIVE" : "DEAD"
-      //   } `
-      // )
       index++
-      count = 0
     }
   }
-
   drawImage(boardNext)
   for (let i = 0; i < boardNext.length; i++) {
     BOARDS[0][i] = boardNext[i]
   }
-  setTimeout(() => {
-    renew()
-  }, DELAY)
+  reRender()
+}
+function reRender() {
+  if (isRendering === true) {
+    setTimeout(() => {
+      requestAnimationFrame(renew)
+    }, DELAY)
+  } else {
+    return 0
+  }
 }
 
 function drawImage(board) {
@@ -216,15 +220,37 @@ function drawImage(board) {
   }
   ctx.putImageData(imageData, 0, 0)
 }
+function calcResolution(data) {
+  RESOLUTION = data
+}
+function stopDraw() {
+  isRendering = false
+  clearCanvas()
+}
+function clearCanvas() {
+  const isCanvasMounted = document.querySelector("#canvas__mount")
+  if (isCanvasMounted.hasChildNodes()) {
+    isCanvasMounted.removeChild(isCanvasMounted.firstChild)
+  } else {
+    if (CANVAS_WIDTH === 0 || CANVAS_HEIGHT === 0) return
+  }
+}
+function randomize(event) {
+  event.preventDefault()
+  isRendering = false
 
-// function rerender() {
-//   const LIVING_CELLS = renew()
-//   if (LIVING_CELLS) {
-//     setTimeout(() => {
-//       renew()
-//     }, DELAY)
-//   }
-// }
+  let data = data32
+  const density = 0.15
+  for (let i = 0; i < BOARDS[0].length; i++) {
+    BOARDS[0][i] = Math.random() < density ? 1 : 0
+  }
+
+  window.requestAnimationFrame(() => drawImage(BOARDS[0]))
+  setTimeout(() => {
+    isRendering = true
+    renew()
+  }, DELAY * 2)
+}
 
 document.addEventListener(
   "DOMContentLoaded",

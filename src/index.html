@@ -11,25 +11,6 @@
     <div class="input-wrapper">
       <h3 class="h3__Style">Настройки</h3>
       <div class="user-unit">
-        <form id="data" class="user-input">
-          <span>Поле: &nbsp;</span>
-          <input
-            id="width_input"
-            class="input"
-            inputmode="numeric"
-            placeholder="Ширина"
-          />
-          <input
-            id="height_input"
-            class="input"
-            inputmode="numeric"
-            placeholder="Высота"
-          />
-          <button class="button" form="data" id="startButton" type="submit">
-            Заполнить
-          </button>
-          <button class="button" id="stopButton">Сброс</button>
-        </form>
         <div class="user-input">
           <span>Размер ячейки: &nbsp;</span>
           <div>
@@ -39,43 +20,68 @@
               min="0"
               max="10"
               step="2"
-              value="4"
+              value="2"
               oninput="this.nextElementSibling.value = this.value"
               id="input_1"
             />
-            <output id="output_1" class="user-input__output">4</output>
+            <output id="output_1" class="user-input__output">2</output>
           </div>
         </div>
+        <form id="data" class="user-input">
+          <span>Поле: &nbsp;</span>
+          <input
+            id="width_input"
+            class="input"
+            inputmode="numeric"
+            placeholder="Ширина"
+            oninput="this.nextElementSibling.value = this.value"
+          />
+          <input
+            id="height_input"
+            class="input"
+            inputmode="numeric"
+            placeholder="Высота"
+            value=""
+            disabled="true"
+          />
+          <button class="button" form="data" id="startButton" type="submit">
+            Заполнить
+          </button>
+          <button class="button" id="stopButton">Сброс</button>
+        </form>
+
         <div class="user-input">
           <span>Скорость: &nbsp;</span>
           <div>
             <input
               class="user-input__input"
               type="range"
-              min="1"
-              max="10"
-              step="1"
-              value="6"
+              min="8"
+              max="128"
+              step="8"
+              value="8"
               oninput="this.nextElementSibling.value = this.value"
-              id="input_2"
+              id="delay_input"
             />
 
-            <output id="output_2" class="user-input__output">6</output>
+            <output id="output_2" class="user-input__output">8</output>
           </div>
           <div>
-            <button class="button" form="data" id="startLoop" type="submit">
-              Старт
-            </button>
+            <button class="button" id="startLoop">Старт</button>
           </div>
-          <!-- <div>
-            <button class="button" form="data" id="startLoop" type="submit">
+          <div>
+            <button class="button" form="data" id="stopLoop" type="submit">
               Стоп
             </button>
-          </div> -->
+          </div>
+          <div>
+            <button class="button" form="data" id="random" type="submit">
+              Random
+            </button>
+          </div>
         </div>
       </div>
     </div>
-
     <div class="canvas-wrapper">
       <div id="canvas__mount" clas="border"></div>
     </div>
