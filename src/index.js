@@ -239,7 +239,6 @@ function randomize(event) {
   event.preventDefault()
   isRendering = false
 
-  let data = data32
   const density = 0.15
   for (let i = 0; i < BOARDS[0].length; i++) {
     BOARDS[0][i] = Math.random() < density ? 1 : 0
